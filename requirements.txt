@@ -1,0 +1,6 @@
+streamlit
+fpdf
+python-dotenv
+pytest
+streamlit_js_eval
+st-theme
