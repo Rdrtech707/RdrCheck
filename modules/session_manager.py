@@ -2,7 +2,7 @@
 import requests
 import streamlit as st
 
-API_URL = "http://localhost:5000"  # Ajuste se o backend estiver em outra porta/host
+API_URL = "https://rdrcheck.onrender.com" # Ajuste se o backend estiver em outra porta/host
 
 def initialize_session():
     if "logged_in" not in st.session_state:
