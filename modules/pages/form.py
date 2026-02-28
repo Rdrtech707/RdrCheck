@@ -6,23 +6,27 @@ import re       # Import para validação via expressões regulares
 from modules.pages.form_helpers import (
     select_first_options,
     deselect_all_options,
-    render_inspection_groups
+    render_inspection_groups,
+    clear_form_session_state,
 )
 from modules.pdf_generator import generate_pdf
 from modules.email_sender import enviar_email
-from modules.database import insert_inspection  # Função para inserir no BD
+from modules.database import insert_inspection, get_form_draft, set_form_draft, clear_form_draft
 
-def form_page():
-    """Página do Formulário de Revisão Veicular"""
-    st.title("📋 Formulário de Revisão Veicular")
+@st.fragment
+def _form_content():
+    """Conteúdo do formulário em fragment: interações só re-executam este bloco."""
+    if st.session_state.pop("_form_reset_requested", None):
+        clear_form_session_state()
 
     if "form_values" not in st.session_state:
-        st.session_state["form_values"] = {}
+        draft = get_form_draft(st.session_state.get("username", ""))
+        st.session_state["form_values"] = draft if draft else {}
 
-    # Campos básicos
+    username = st.session_state.get("username", "")
+
     col1, col2 = st.columns(2)
     with col1:
-        # Lê o valor digitado e atualiza para MAIÚSCULAS e sem hífens
         placa_input = st.text_input(
             "🚗 Placa do veículo", key="placa",
             value=st.session_state["form_values"].get("placa", "")
@@ -48,15 +52,9 @@ def form_page():
     )
     st.session_state["form_values"]["observacoes"] = observacoes
 
-    # ----------------------------------------------------------------------------
-    # Botão "Desmarcar todas as opções" => acessível a TODOS os usuários
-    # ----------------------------------------------------------------------------
     if st.button("Desmarcar todas as opções"):
         deselect_all_options()
 
-    # ----------------------------------------------------------------------------
-    # Botão "Selecionar somente as primeiras opções" => acessível SOMENTE ao admin
-    # ----------------------------------------------------------------------------
     if st.session_state.role == "admin":
         st.markdown("---")
         st.markdown("### Função Extra de Administrador")
@@ -65,9 +63,8 @@ def form_page():
             on_click=select_first_options
         )
 
-    # ----------------------------------------------------------------------------
-    # Botão que gera o PDF, salva a inspeção no BD e disponibiliza
-    # ----------------------------------------------------------------------------
+    set_form_draft(username, st.session_state["form_values"])
+
     EMAIL_FIXO = "707motorsport@gmail.com"
     if st.button("📄 Gerar PDF"):
         # Verifica se os campos obrigatórios estão preenchidos
@@ -130,6 +127,7 @@ def form_page():
                 pdf_path=pdf_file_path
             )
             st.info(f"Inspeção registrada com ID: {inspection_id}")
+            clear_form_draft(username)
 
             assunto = f"Relatório Veicular - {placa}"
             mensagem = (
@@ -144,5 +142,18 @@ def form_page():
                 st.success("✅ E-mail enviado com sucesso!")
             else:
                 st.error("❌ Erro ao enviar o e-mail. Verifique logs/console.")
+
+            st.session_state["_form_reset_requested"] = True
+            clear_form_session_state()
+            if hasattr(st, "rerun"):
+                st.rerun()
+            elif hasattr(st, "experimental_rerun"):
+                st.experimental_rerun()
         else:
             st.error("❌ Erro ao gerar o PDF. Tente novamente.")
+
+
+def form_page():
+    """Página do Formulário de Revisão Veicular"""
+    st.title("📋 Formulário de Revisão Veicular")
+    _form_content()

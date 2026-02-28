@@ -2,5 +2,8 @@ streamlit
 fpdf
 python-dotenv
 pytest
+requests
 streamlit_js_eval
 st-theme
+pyodbc
+pandas

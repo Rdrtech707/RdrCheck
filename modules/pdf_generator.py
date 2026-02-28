@@ -11,8 +11,8 @@ class CustomPDF(FPDF):
     def header(self):
         """Define o cabeçalho do PDF com o logo e o título centralizado."""
         logo_path = "assets/logo.png"  # Ajuste o caminho se necessário
-        if os.path.exists(logo_path):
-            # Adiciona o logo no canto superior esquerdo (x=10, y=8) com largura de 30mm
+        if os.path.exists(logo_path):  
+        # Adiciona o logo no canto superior esquerdo (x=10, y=8) com largura de 30mm
             self.image(logo_path, 10, 8, 30)
         # Define a fonte para o título
         self.set_font("Arial", "B", 12)
@@ -32,6 +32,7 @@ class CustomPDF(FPDF):
 def remove_unicode(text):
     """Remove caracteres Unicode incompatíveis com FPDF (latin-1)"""
     return text.encode("latin-1", "ignore").decode("latin-1")
+
 
 def generate_pdf(placa, km, items, mecanico, observacoes):
     """Gera um PDF otimizado para modo paisagem, com logo e layout aprimorado."""
@@ -127,3 +128,102 @@ def generate_pdf(placa, km, items, mecanico, observacoes):
     if not os.path.exists(pdf_file_path):
         return None
     return pdf_file_path
+
+# --- Nova função para gerar relatório PDF das OS ---
+def generate_os_pdf_report(placa: str, df_ordens_ativas, df_ordens_recusadas, mdb_file: str, db_password: str) -> bytes:
+    """
+    Gera um relatório PDF com as OS ativas (SITUACAO 10) e OS recusadas (SITUACAO 11)
+    para a placa informada.
+    Retorna o PDF em bytes.
+    """
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    
+    # Título do relatório
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, f"Relatório de OS para placa: {placa.upper()}", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Larguras das colunas para as tabelas
+    col1_width = 130  # para a descrição
+    col2_width = 50   # para a quantidade
+    
+    # Importa as funções do módulo access_db para buscar peças e serviços
+    from modules.access_db import fetch_os_pecas_by_cod, fetch_os_servicos_by_osnum
+    
+    # Para cada OS ativa, cria uma seção com tabelas de peças e serviços
+    for _, ordem in df_ordens_ativas.iterrows():
+        os_num = ordem['CODIGO']
+        saida = ordem['SAIDA']
+        km = ordem['KILOMET']
+        
+        # Cabeçalho da OS
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, f"OS: {os_num} | Saída: {saida} | Quilometragem: {km}", ln=True)
+        pdf.ln(2)
+        
+        # Tabela de PEÇAS
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, "PEÇAS", ln=True)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(col1_width, 8, "Descrição", border=1, align="C")
+        pdf.cell(col2_width, 8, "Quantidade", border=1, align="C")
+        pdf.ln(8)
+        
+        pdf.set_font("Arial", "", 11)
+        df_pecas = fetch_os_pecas_by_cod(mdb_file, db_password, os_num)
+        if not df_pecas.empty:
+            for _, row in df_pecas.iterrows():
+                descricao = row["DESCRICAO"]
+                qtd = str(row["QTD"])
+                pdf.cell(col1_width, 8, descricao, border=1)
+                pdf.cell(col2_width, 8, qtd, border=1, align="C")
+                pdf.ln(8)
+        else:
+            pdf.cell(col1_width + col2_width, 8, "Nenhuma peça encontrada.", border=1, align="C")
+            pdf.ln(8)
+        
+        pdf.ln(5)
+        
+        # Tabela de SERVIÇOS
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, "SERVIÇOS", ln=True)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(col1_width, 8, "Descrição", border=1, align="C")
+        pdf.cell(col2_width, 8, "Quantidade", border=1, align="C")
+        pdf.ln(8)
+        
+        pdf.set_font("Arial", "", 11)
+        df_servicos = fetch_os_servicos_by_osnum(mdb_file, db_password, os_num)
+        if not df_servicos.empty:
+            for _, row in df_servicos.iterrows():
+                descricao = row["DESCRICAO"]
+                # Para serviços, a quantidade fica em branco
+                pdf.cell(col1_width, 8, descricao, border=1)
+                pdf.cell(col2_width, 8, "", border=1, align="C")
+                pdf.ln(8)
+        else:
+            pdf.cell(col1_width + col2_width, 8, "Nenhum serviço encontrado.", border=1, align="C")
+            pdf.ln(8)
+        
+        pdf.ln(10)  # Espaço entre as OS
+    
+    # Se houver OS recusadas, adiciona a seção
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "OS Recusadas pelo cliente (SITUACAO 11):", ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", "", 11)
+    if df_ordens_recusadas.empty:
+        pdf.cell(0, 10, "Nenhuma OS recusada encontrada.", ln=True)
+    else:
+        for _, ordem in df_ordens_recusadas.iterrows():
+            os_num = ordem['CODIGO']
+            saida = ordem['SAIDA']
+            km = ordem['KILOMET']
+            pdf.cell(0, 10, f"OS: {os_num} | Saída: {saida} | Quilometragem: {km}", ln=True)
+            pdf.ln(5)
+    
+    # Converte o PDF para bytes
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return pdf_bytes

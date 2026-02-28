@@ -50,6 +50,14 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Tabela de rascunhos do formulário (um por usuário, sobrevive ao recarregar)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS form_drafts (
+            username TEXT PRIMARY KEY,
+            form_values_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -154,3 +162,40 @@ def get_admin_logs():
     logs = cursor.fetchall()
     conn.close()
     return logs
+
+
+# RASCUNHOS DO FORMULÁRIO (persistem ao recarregar a página)
+
+def get_form_draft(username):
+    """Retorna o rascunho do formulário do usuário (dict) ou None."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT form_values_json FROM form_drafts WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row["form_values_json"]:
+        return json.loads(row["form_values_json"])
+    return None
+
+
+def set_form_draft(username, form_values):
+    """Salva o rascunho do formulário do usuário."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO form_drafts (username, form_values_json, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(username) DO UPDATE SET form_values_json = ?, updated_at = CURRENT_TIMESTAMP""",
+        (username, json.dumps(form_values), json.dumps(form_values))
+    )
+    conn.commit()
+    conn.close()
+
+
+def clear_form_draft(username):
+    """Remove o rascunho do formulário do usuário (ex.: após gerar o PDF)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM form_drafts WHERE username = ?", (username,))
+    conn.commit()
+    conn.close()

@@ -1,14 +1,13 @@
+# RdrCheck/app.py
 import os
 import streamlit as st
 from streamlit_theme import st_theme
-
 from modules.session_manager import initialize_session, check_session, login, logout
 from modules.pages.form import form_page
 from modules.pages.reports import reports_page
 from modules.pages.admin import admin_page
-from modules.pdf_generator import generate_pdf
-from modules.email_sender import enviar_email
 from modules.database import init_db
+from modules.pages.historico_os import historico_os_page
 
 st.set_page_config(page_title="Relatório de Inspeção", page_icon="🔧", layout="wide")
 
@@ -48,19 +47,8 @@ else:
         logout()
     
     # Integra o st_theme para obter o tema ativo
-    theme = st_theme()  # Retorna um dicionário com as configurações do tema
-    # Utiliza a cor de fundo definida no tema para o cabeçalho
-    bg_color_theme = theme.get("backgroundColor", "#ffffff")
-    
-    # Função para detectar se uma cor hexadecimal é escura
-    def is_dark_color(hex_color):
-        try:
-            value = int(hex_color.lstrip("#"), 16)
-            return value < 0x888888
-        except Exception:
-            return False
-
-    if is_dark_color(bg_color_theme):
+    theme_base = st.get_option("theme.base")
+    if theme_base == "dark":
         header_color = "#0E1117"
     else:
         header_color = "#ffffff"
@@ -75,14 +63,16 @@ else:
         unsafe_allow_html=True
     )
     
-    # Seleção de páginas
+    # Adiciona a nova opção "Histórico OS" à navegação
     aba_selecionada = st.sidebar.radio(
         "📌 Selecione a Página",
-        ["📄 Formulário", "📊 Relatórios"] + (["⚙️ Administração"] if st.session_state.role == "admin" else [])
+        ["📄 Formulário", "📊 Relatórios", "📝 Histórico OS"] + (["⚙️ Administração"] if st.session_state.role == "admin" else [])
     )
     if aba_selecionada == "📄 Formulário":
         form_page()
     elif aba_selecionada == "📊 Relatórios":
         reports_page()
+    elif aba_selecionada == "📝 Histórico OS":
+        historico_os_page()
     elif aba_selecionada == "⚙️ Administração":
         admin_page()

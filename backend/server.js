@@ -2,6 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const jwt = require("jsonwebtoken");
 
@@ -9,14 +10,16 @@ const app = express();
 const PORT = 5000;
 const SECRET_KEY = "chave_secreta_sua"; // Troque para algo seguro
 
+// Caminho do BD sempre relativo à raiz do projeto (pasta pai de backend/)
+const DB_PATH = path.join(__dirname, "..", "inspections.db");
+
 app.use(cors({
   origin: "http://localhost:8501", // Streamlit rodando local
   credentials: false // não vamos usar cookies
 }));
 app.use(bodyParser.json());
 
-// Conexão com banco de dados (ajuste o caminho se for diferente)
-const db = new sqlite3.Database("../inspections.db", (err) => {
+const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error("Erro ao conectar BD:", err);
   } else {
@@ -44,7 +47,7 @@ app.post("/login", (req, res) => {
         SECRET_KEY,
         { expiresIn: "1h" }
       );
-      res.json({ token }); // retorna token no JSON
+      res.json({ token, role: user.role });
     }
   );
 });
