@@ -1,7 +1,10 @@
 import streamlit as st
 import os
-import base64  # Necessário para codificar o PDF em Base64
-import re       # Import para validação via expressões regulares
+import base64
+import re
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from modules.pages.form_helpers import (
     select_first_options,
@@ -65,7 +68,7 @@ def _form_content():
 
     set_form_draft(username, st.session_state["form_values"])
 
-    EMAIL_FIXO = "707motorsport@gmail.com"
+    email_destino = os.getenv("EMAIL_DESTINATARIO") or os.getenv("EMAIL_REMETENTE", "")
     if st.button("📄 Gerar PDF"):
         # Verifica se os campos obrigatórios estão preenchidos
         if not placa or not km:
@@ -137,11 +140,14 @@ def _form_content():
                 f"KM: {km}\n\n"
                 f"Att."
             )
-            sucesso = enviar_email(EMAIL_FIXO, assunto, mensagem, pdf_file_path)
-            if sucesso:
-                st.success("✅ E-mail enviado com sucesso!")
+            if email_destino:
+                sucesso = enviar_email(email_destino, assunto, mensagem, pdf_file_path)
+                if sucesso:
+                    st.success("✅ E-mail enviado com sucesso!")
+                else:
+                    st.error("❌ Erro ao enviar o e-mail. Verifique logs/console.")
             else:
-                st.error("❌ Erro ao enviar o e-mail. Verifique logs/console.")
+                st.warning("⚠️ E-mail de destino não configurado. Defina EMAIL_DESTINATARIO ou EMAIL_REMETENTE no .env")
 
             st.session_state["_form_reset_requested"] = True
             clear_form_session_state()
