@@ -1,10 +1,12 @@
 # modules/session_manager.py
+import os
 import requests
 import streamlit as st
 from modules.users import authenticate
 
-API_URL = "http://localhost:5000"
-REQUEST_TIMEOUT = 3  # segundos; se o backend não responder, usa autenticação local
+# URL do backend: use API_URL no .env para produção (ex: https://rdrcheck.onrender.com)
+API_URL = os.getenv("API_URL", "http://localhost:5000")
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "3"))  # segundos; se o backend não responder, usa autenticação local
 
 def initialize_session():
     if "logged_in" not in st.session_state:
